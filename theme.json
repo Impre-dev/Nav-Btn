@@ -3,7 +3,7 @@
   "name": "Nav-Btn",
   "description": "Bouton de navigation edge — révélé par le bord droit (fusion NavBtn × URLBar-2.0)",
   "author": "Impre",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "js": true,
   "scripts": {
     "navbtn.uc.js": {

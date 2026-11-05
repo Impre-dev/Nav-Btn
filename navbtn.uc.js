@@ -156,6 +156,7 @@
     window.__navBtn = true;
 
     buildButton();
+    edgeReveal(); // Fusion 05/11 : révélation par le bord droit (spec bureau)
     watchTabs();
     // Le portage switcher touche aux internals natifs de ctrlTab : une maj
     // Zen peut les casser (v1.4.13 : maxTabPreviews devenu getter-only →
@@ -195,7 +196,7 @@
       },
     });
 
-    console.log('[NavBtn] v1.4.14 — bouton prêt, MRU armé au SSWindowRestored');
+    console.log('[Nav-Btn] v1.1.0 — clone fusion : edgeReveal actif, MRU armé au SSWindowRestored');
     tr('=== BOOT NavBtn v1.4.14 — fenêtre', WTAG, '===');
 
     // Sonde TabOpen : si des CustomTab apparaissent pendant que le panel
@@ -311,6 +312,7 @@
   let curEl; // favicon droite — site courant (présent)
   let tgtEl; // favicon gauche — site précédent (passé, la cible)
   let wrapEl;
+  let edgeIdle = true; // edge reveal : true = caché, révélé par le bord droit (fusion 05/11)
 
   function buildButton() {
     const wrap = document.createElement('div');
@@ -479,17 +481,14 @@
 
   function updateButton() {
     if (!btn) return;
-    const t = targetTab();
+    const t = targetTab(); // favicon cible (plus bas) — la visibilité, elle, est pilotée par edgeReveal
 
-    // Auto-hide : invisible tant qu'aucun aller-retour n'est possible,
-    // pendant le boot splash BG-Zen (notre z-index flotte au-dessus de lui),
-    // ou tant que l'onglet courant charge (attribut busy) → le bouton
-    // n'apparaît qu'une fois le site arrivé, favicons déjà posées
-    // (l'entrée/sortie de busy tire TabAttrModified → event-driven).
-    const curTab = gBrowser.selectedTab;
-    const loading = !!curTab && curTab.hasAttribute('busy');
+    // Fusion 05/11 : la visibilité n'est plus pilotée par la cible — le
+    // bouton porte aussi l'urlbar, il se révèle même sans switch possible.
+    // Seul edgeReveal pilote navbtn-notarget ; le boot splash BG-Zen reste
+    // respecté tant que le bouton n'est pas révélé.
     if (wrapEl) {
-      wrapEl.classList.toggle('navbtn-notarget', (!t || loading || bootSplashActive()) && pref.bool('navbtn.autoHide', true));
+      wrapEl.classList.toggle('navbtn-notarget', bootSplashActive() && edgeIdle);
     }
 
     // Favicon droite — où tu es (le présent)
@@ -1118,6 +1117,99 @@
     } catch (e) {
       tr('!! openInstant a jeté:', e.message, '·', (e.stack || '').split('\n')[1] || '');
     }
+  }
+
+  // ================================================================
+  // EDGE REVEAL — le bouton n'est plus permanent : révélé par le bord
+  // (fusion 05/11 — spec bureau). Machine à états event-driven :
+  //   IDLE → (mouseenter hitbox) → REVEALED (deadline = now + timeout)
+  //   REVEALED → (mouseenter btn) → FROZEN (timer gelé, remaining mémorisé)
+  //   FROZEN → (mouseleave btn) → REVEALED (setTimeout remaining, pas un reset)
+  //   REVEALED → (deadline) → RETRACT → IDLE
+  // Anti-flicker : expiration pendant que le curseur est dans la hitbox
+  // → pas de nouveau mouseenter → reste caché jusqu'à sort/ré-entrée.
+  // L'anim d'entrée/sortie = le preset navbtn-anim actif (labo MCM) :
+  // navbtn-notarget porte l'état caché (transition de sortie), son retrait
+  // l'état visible (transition d'entrée) — mécanisme existant, réutilisé.
+  // ================================================================
+  const EDGE_TIMEOUT_MS = 2000; // durée de vie du bouton révélé (pref MCM possible plus tard)
+
+  function edgeReveal() {
+    if (document.getElementById('navbtn-edge-hitbox')) return;
+
+    // Styles auto-injectés en <style> — immunisés contre le cache mods.json
+    // de Sine (leçon 16/10 : un style.chrome ajouté après coup n'est jamais
+    // enregistré, injecter depuis le JS).
+    const STYLE_ID = 'navbtn-edge-style';
+    if (!document.getElementById(STYLE_ID)) {
+      const st = document.createElementNS('http://www.w3.org/1999/xhtml', 'style');
+      st.id = STYLE_ID;
+      st.textContent = `
+#navbtn-edge-hitbox {
+  position: fixed !important;
+  top: 0 !important;
+  right: 0 !important;
+  width: 40px !important;
+  height: 100% !important;
+  z-index: 9998 !important; /* sous dock/rail BetterSidebot (9999) */
+  background: transparent !important;
+  border: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  appearance: none !important;
+  -moz-appearance: none !important;
+}
+`;
+      document.documentElement.appendChild(st);
+    }
+
+    const hitbox = document.createElementNS('http://www.w3.org/1999/xhtml', 'div');
+    hitbox.id = 'navbtn-edge-hitbox';
+    document.getElementById('browser').appendChild(hitbox);
+
+    let state = 'idle';
+    let timer = null;
+    let deadline = 0;
+    let remaining = EDGE_TIMEOUT_MS;
+
+    const retract = () => {
+      clearTimeout(timer);
+      timer = null;
+      edgeIdle = true;
+      wrapEl.classList.add('navbtn-notarget');
+      state = 'idle';
+    };
+
+    const reveal = () => {
+      if (state !== 'idle') return;
+      edgeIdle = false;
+      wrapEl.classList.remove('navbtn-notarget');
+      state = 'revealed';
+      deadline = performance.now() + EDGE_TIMEOUT_MS;
+      remaining = EDGE_TIMEOUT_MS;
+      clearTimeout(timer);
+      timer = setTimeout(retract, EDGE_TIMEOUT_MS);
+    };
+
+    const freeze = () => {
+      if (state !== 'revealed') return;
+      state = 'frozen';
+      clearTimeout(timer);
+      remaining = Math.max(0, deadline - performance.now());
+    };
+
+    const resume = () => {
+      if (state !== 'frozen') return;
+      state = 'revealed';
+      clearTimeout(timer);
+      timer = setTimeout(retract, remaining);
+    };
+
+    hitbox.addEventListener('mouseenter', reveal);
+    btn.addEventListener('mouseenter', freeze);
+    btn.addEventListener('mouseleave', resume);
+
+    console.log('[Nav-Btn] edgeReveal actif (bord droit 40px, timeout ' + EDGE_TIMEOUT_MS + 'ms, gel au hover bouton)');
   }
 
   // ================================================================
