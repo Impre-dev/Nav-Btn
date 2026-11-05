@@ -63,15 +63,14 @@
 }
 
 /* ----------------------------------------------------------------
-   Slash VS — séparateur façon écran de combat d'arcade
-   [où tu es] / [où tu vas]
+   Séparateur — trait vertical droit (05/11, remplace le slash incliné)
+   [où tu es] | [où tu vas] — masqué sans cible (un seul tab)
    ---------------------------------------------------------------- */
 .navbtn-slash {
-  width: 3px;
-  height: 17px;
+  width: 2px;
+  height: 24px;
   border-radius: 1px;
   background: var(--navbtn-fg);
-  transform: rotate(18deg);
 }
 
 /* ----------------------------------------------------------------
@@ -274,6 +273,12 @@
    Ici : même spécificité que les presets, c'est l'ordre source qui
    fait gagner. Valeurs d'origine v1.1.0/v1.3.2 (validées).
    ================================================================ */
+#navbtn-wrap.navbtn-solo #navbtn {
+  /* Mono-tab : favicon seule — bouton compact (05/11) */
+  min-width: 0;
+  padding: 0 12px;
+}
+
 #navbtn-wrap:not(.navbtn-notarget) #navbtn:active {
   box-shadow: 0px 2px 0px 0px var(--navbtn-fg);
   transform: translateY(6px);

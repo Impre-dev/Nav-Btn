@@ -311,6 +311,7 @@
   let btn;
   let curEl; // favicon droite — site courant (présent)
   let tgtEl; // favicon gauche — site précédent (passé, la cible)
+  let slashEl; // séparateur — masqué sans cible (un seul tab = pas de "vers")
   let wrapEl;
   let edgeIdle = true; // edge reveal : true = caché, révélé par le bord droit (fusion 05/11)
 
@@ -335,6 +336,7 @@
 
     const slash = document.createElement('div');
     slash.className = 'navbtn-slash';
+    slashEl = slash;
 
     curEl = document.createElement('div');
     curEl.className = 'navbtn-fav navbtn-cur';
@@ -485,10 +487,15 @@
 
     // Fusion 05/11 : la visibilité n'est plus pilotée par la cible — le
     // bouton porte aussi l'urlbar, il se révèle même sans switch possible.
-    // Seul edgeReveal pilote navbtn-notarget ; le boot splash BG-Zen reste
-    // respecté tant que le bouton n'est pas révélé.
+    // Seul edgeReveal retire navbtn-notarget : updateButton ne fait que
+    // RÉ-AFFIRMER le caché pendant le boot splash BG-Zen (jamais de reveal
+    // ici — sinon toggle(false) retirait la classe à chaque TabOpen et le
+    // bouton se montrait sans timer). Mono-tab → bouton compact (navbtn-solo).
     if (wrapEl) {
-      wrapEl.classList.toggle('navbtn-notarget', bootSplashActive() && edgeIdle);
+      if (bootSplashActive() && edgeIdle) {
+        wrapEl.classList.add('navbtn-notarget');
+      }
+      wrapEl.classList.toggle('navbtn-solo', !t);
     }
 
     // Favicon droite — où tu es (le présent)
@@ -506,9 +513,12 @@
     if (!t) {
       tgtEl.style.backgroundImage = '';
       tgtEl.classList.add('navbtn-nofav');
+      slashEl.style.display = 'none'; // pas de "vers" → le séparateur n'a plus rien à séparer
       btn.setAttribute('tooltiptext', 'NavBtn — rien à switcher');
       return;
     }
+
+    slashEl.style.display = '';
 
     const img = t.getAttribute('image');
     if (img) {
