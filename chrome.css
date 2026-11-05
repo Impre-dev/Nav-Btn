@@ -1,0 +1,297 @@
+/* ================================================================
+   NavBtn — bouton overlay gamboy (pression au clic)
+   Langage visuel : border 2px + hard shadow + radius asymétrique
+   Couleurs épinglées en dur (look gameboy permanent — dissociation
+   du schéma UI, 27/10 : avant, elles suivaient la toolbar/thème)
+   ================================================================ */
+
+#navbtn-wrap {
+  position: fixed;
+  bottom: 30px;
+  right: 24px;
+  z-index: 2147483647;
+  pointer-events: none; /* ne bloque jamais la page en dessous */
+}
+
+#navbtn-wrap.navbtn-hidden {
+  display: none;
+}
+
+/* Aucun aller-retour possible → invisible (fade simple)
+   (.navbtn-preview = preview MCM, voir labo d'animations) */
+#navbtn-wrap:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+}
+
+#navbtn {
+  opacity: 0.98;
+  pointer-events: auto;
+  cursor: pointer;
+  -moz-user-select: none;
+  user-select: none;
+
+  /* Valeurs en dur (dissociation 27/10) : les vars toolbar natives sont des
+     couleurs concrètes recalculées selon le schéma UI → le bouton changeait de
+     look avec le thème. Épinglées au relevé de l'opérateur (fond #FBFBFB,
+     ombre #BEB7BE), il ne suit plus que lui-même. */
+  --navbtn-bg: #fbfbfb;
+  --navbtn-fg: #beb7be;
+
+  background: var(--navbtn-bg);
+  height: 52px;
+  min-width: 52px;
+  border-radius: 50px; /* radius signature */
+  border: solid 2px var(--navbtn-fg);
+  box-shadow: 0px 8px 0px 0px var(--navbtn-fg);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 0 18px;
+  position: relative;
+  z-index: 12;
+
+  /* Descente claquante (50ms), remontée ressort (overshoot)
+     + fade pour l'auto-hide */
+  transition:
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+}
+
+/* ----------------------------------------------------------------
+   Slash VS — séparateur façon écran de combat d'arcade
+   [où tu es] / [où tu vas]
+   ---------------------------------------------------------------- */
+.navbtn-slash {
+  width: 3px;
+  height: 17px;
+  border-radius: 1px;
+  background: var(--navbtn-fg);
+  transform: rotate(18deg);
+}
+
+/* ----------------------------------------------------------------
+   Favicon de l'onglet cible — feedback "où le prochain clic t'envoie"
+   ---------------------------------------------------------------- */
+.navbtn-fav {
+  width: 20px;
+  height: 20px;
+  background-image: var(--navbtn-fav-img, none);
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
+/* Pas de favicon disponible → élément masqué */
+.navbtn-fav.navbtn-nofav {
+  display: none;
+}
+
+/* ----------------------------------------------------------------
+   Shake — "rien à switcher" (déclenché par JS sur animationend cleanup)
+   ---------------------------------------------------------------- */
+@keyframes navbtn-shake {
+  0%,
+  100% {
+    transform: translateX(0);
+  }
+  25% {
+    transform: translateX(-4px);
+  }
+  75% {
+    transform: translateX(4px);
+  }
+}
+
+#navbtn.navbtn-shake {
+  animation: navbtn-shake 0.25s ease-in-out;
+}
+
+/* ================================================================
+   LABO D'ANIMATIONS — presets live via la pref MCM navbtn.anim
+   (attribut navbtn-anim sur le wrap, changé sans restart)
+   Base sans attribut = fade (règles ci-dessus).
+   Convention : l'état caché définit la position de départ + la
+   transition de SORTIE ; l'état visible définit la transition
+   d'ENTRÉE (la transition de l'état destination gouverne).
+   ================================================================ */
+
+/* --- PREVIEW MCM : fige l'état caché SANS transition,
+   le retrait de la classe rejoue l'entrée du preset (piloté par JS) --- */
+#navbtn-wrap.navbtn-preview #navbtn {
+  transition: none !important;
+  animation: none !important;
+}
+
+/* --- STEPS : sprite spawn 8-bit, apparition en frames sèches --- */
+#navbtn-wrap[navbtn-anim='steps']:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.35);
+  transition:
+    transform 0.12s steps(2, end),
+    opacity 0.08s steps(1, end),
+    box-shadow 0.1s,
+    visibility 0s 0.12s;
+}
+#navbtn-wrap[navbtn-anim='steps']:not(.navbtn-notarget) #navbtn {
+  transition:
+    transform 0.3s steps(5, end),
+    opacity 0.2s steps(3, end),
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    visibility 0s;
+}
+
+/* --- SLIDE : entre/sort du bord droit, façon HUD --- */
+#navbtn-wrap[navbtn-anim='slide']:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateX(140%);
+  transition:
+    transform 0.18s ease-in,
+    opacity 0.15s ease-in,
+    box-shadow 0.1s,
+    visibility 0s 0.18s;
+}
+#navbtn-wrap[navbtn-anim='slide']:not(.navbtn-notarget) #navbtn {
+  transition:
+    transform 0.35s cubic-bezier(0.2, 0.9, 0.25, 1),
+    opacity 0.25s ease-out,
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    visibility 0s;
+}
+
+/* --- POP : ressort cartoon, scale overshoot marqué --- */
+#navbtn-wrap[navbtn-anim='pop']:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: scale(0.3);
+  transition:
+    transform 0.12s ease-in,
+    opacity 0.1s ease-in,
+    box-shadow 0.1s,
+    visibility 0s 0.12s;
+}
+#navbtn-wrap[navbtn-anim='pop']:not(.navbtn-notarget) #navbtn {
+  transition:
+    transform 0.4s cubic-bezier(0.3, 1.6, 0.4, 1),
+    opacity 0.2s ease-out,
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    visibility 0s;
+}
+
+/* --- DROP : chute du ciel avec rebond léger --- */
+#navbtn-wrap[navbtn-anim='drop']:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transform: translateY(-48px);
+  transition:
+    transform 0.15s ease-in,
+    opacity 0.12s ease-in,
+    box-shadow 0.1s,
+    visibility 0s 0.15s;
+}
+#navbtn-wrap[navbtn-anim='drop']:not(.navbtn-notarget) #navbtn {
+  transition:
+    transform 0.4s cubic-bezier(0.3, 1.4, 0.5, 1),
+    opacity 0.2s ease-out,
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    visibility 0s;
+}
+
+/* --- BLINK : power-on Game Boy — apparaît puis clignote sec --- */
+#navbtn-wrap[navbtn-anim='blink']:is(.navbtn-notarget, .navbtn-preview) #navbtn {
+  opacity: 0;
+  visibility: hidden;
+  pointer-events: none;
+  transition:
+    opacity 0.05s steps(1, end),
+    visibility 0s 0.05s;
+}
+#navbtn-wrap[navbtn-anim='blink']:not(.navbtn-notarget) #navbtn {
+  animation: navbtn-blink 0.5s steps(1, end);
+}
+@keyframes navbtn-blink {
+  0% {
+    opacity: 1;
+  }
+  30% {
+    opacity: 0;
+  }
+  55% {
+    opacity: 1;
+  }
+  75% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+/* (Le switcher ctrlTab est géré en JS : les previews natifs sont déplacés
+   dans une div HTML display:grid — cf ensureGrid/resizePanel dans le .uc.js.
+   Le conteneur natif #ctrlTab-previews est masqué, plus besoin de CSS.) */
+
+/* Switcher — vignettes : padding intérieur natif 8px → 5px pour
+   resserrer l'ensemble (track mesuré sur l'inner, cf resizePanel). */
+#navbtn-ctrltab-grid .ctrlTab-preview-inner {
+  padding: 5px;
+}
+
+/* Switcher — previews masqués : l'attribut hidden XUL n'est pas garanti
+   display:none dans notre div HTML display:grid (feuille UA XUL) →
+   cellules fantômes après fermeture middle-click. Élimination explicite,
+   quel que soit le comportement UA. */
+#navbtn-ctrltab-grid .ctrlTab-preview[hidden] {
+  display: none !important;
+}
+
+/* Switcher : le gris natif du panel (bg rgba(102,102,102,.85) sur le
+   slot shadow) + le padding/flex du thème tidypopup sont neutralisés
+   en JS via styles inline sur le slot — cf neutralizeSlot dans le
+   .uc.js (un ::part(content) CSS ne matche pas depuis cette feuille :
+   ::part = author sheets uniquement). Le blur du switcher est géré par
+   nos propres overlays (#navbtn-ctrltab-blur-*, cf portBlur) avec leur
+   radius inline — Nebula-Fork n'intervient plus sur ctrlTab
+   (doctrine : plans/doctrine-mods.md). */
+
+/* ================================================================
+   PRESSION — règle volontairement EN FIN de feuille. Ne pas déplacer.
+   Les presets du labo (spécificité (2,2,0)) écrasent la transition de
+   #navbtn ((1,1,0)) : placée en tête de feuille, la règle :active
+   perdait le match et le press empruntait le timing d'ENTRÉE du
+   preset actif (steps(5) saccadé, ressort pop 0.4s…) → bouton et
+   socle animés ensembles, effet "flottant" au lieu d'un press net.
+   Ici : même spécificité que les presets, c'est l'ordre source qui
+   fait gagner. Valeurs d'origine v1.1.0/v1.3.2 (validées).
+   ================================================================ */
+#navbtn-wrap:not(.navbtn-notarget) #navbtn:active {
+  box-shadow: 0px 2px 0px 0px var(--navbtn-fg);
+  transform: translateY(6px);
+  transition:
+    box-shadow 0.05s ease,
+    transform 0.05s ease;
+}
+
+/* DÉPRESSION (remontée du press) — même mécanique que la pression :
+   doit gagner contre les presets (spécificité (2,3,0), ordre source).
+   Classe .navbtn-depress posée à pointerup, retirée à transitionend
+   (cf buildButton dans le .uc.js). Sans elle, la remontée emprunterait
+   la transition d'entrée du preset actif (steps(5), ressort pop…) au
+   lieu du ressort d'origine. */
+#navbtn-wrap:not(.navbtn-notarget) #navbtn.navbtn-depress {
+  transition:
+    box-shadow 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    transform 0.18s cubic-bezier(0.2, 0.8, 0.3, 1.2),
+    opacity 0.15s ease,
+    visibility 0.15s ease;
+}

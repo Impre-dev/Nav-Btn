@@ -1,0 +1,18 @@
+{
+  "id": "Nav-Btn",
+  "name": "Nav-Btn",
+  "description": "Bouton de navigation edge — révélé par le bord droit (fusion NavBtn × URLBar-2.0)",
+  "author": "Impre",
+  "version": "1.0.0",
+  "js": true,
+  "scripts": {
+    "navbtn.uc.js": {
+      "name": "Nav-Btn",
+      "description": "Clone étalonnage de NavBtn v1.4.18 (capsule identique) — futur porteur du bouton fusion",
+      "include": ["chrome://browser/content/browser.xhtml"]
+    }
+  },
+  "style": { "chrome": "chrome.css" },
+  "tags": ["Javascript", "Zen"],
+  "fork": ["zen"]
+}

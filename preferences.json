@@ -1,0 +1,52 @@
+[
+  {
+    "property": "navbtn.offsetRight",
+    "label": "📏 Distance du bord DROIT (px)",
+    "type": "string",
+    "defaultValue": "24"
+  },
+  {
+    "property": "navbtn.offsetBottom",
+    "label": "📏 Distance du bord BAS (px)",
+    "type": "string",
+    "defaultValue": "24"
+  },
+  {
+    "property": "navbtn.size",
+    "label": "📐 Hauteur du bouton (px)",
+    "type": "string",
+    "defaultValue": "52"
+  },
+  {
+    "property": "navbtn.hideFullscreen",
+    "label": "Masquer en plein écran (vidéo, jeux…)",
+    "type": "checkbox",
+    "defaultValue": "true"
+  },
+  {
+    "property": "navbtn.sound",
+    "label": "🔊 Son de pression du bouton (key.wav)",
+    "type": "checkbox",
+    "defaultValue": "true"
+  },
+  {
+    "property": "navbtn.autoHide",
+    "label": "Masquer le bouton quand aucun aller-retour n'est possible",
+    "type": "checkbox",
+    "defaultValue": "true"
+  },
+  {
+    "property": "navbtn.anim",
+    "label": "🎞️ Animation d'entrée/sortie du bouton",
+    "type": "dropdown",
+    "defaultValue": "fade",
+    "options": [
+      { "label": "Fade — discret (défaut)", "value": "fade" },
+      { "label": "Steps — sprite spawn 8-bit", "value": "steps" },
+      { "label": "Slide — depuis le bord droit", "value": "slide" },
+      { "label": "Pop — ressort cartoon", "value": "pop" },
+      { "label": "Drop — chute avec rebond", "value": "drop" },
+      { "label": "Blink — power-on Game Boy", "value": "blink" }
+    ]
+  }
+]
