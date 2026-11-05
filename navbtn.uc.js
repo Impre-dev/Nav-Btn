@@ -314,6 +314,7 @@
   let slashEl; // séparateur — masqué sans cible (un seul tab = pas de "vers")
   let wrapEl;
   let edgeIdle = true; // edge reveal : true = caché, révélé par le bord droit (fusion 05/11)
+  let edgeRetract = null; // posé par edgeReveal — retract après pression (Phase B)
 
   function buildButton() {
     const wrap = document.createElement('div');
@@ -358,60 +359,45 @@
     wrap.style.right = offsetRight + 'px';
     btn.style.height = size + 'px';
 
-    // Clic gauche → switch immédiat · middle-click → close (ou discard si épinglé)
+    // ================================================================
+    // GESTES fusion (Phase B, 05/11 — spec bureau) :
+    //   Clic gauche → urlbar flottante (contrat window.URLBar20)
+    //   Middle-click → ouvrir le ctrlTab custom (la fermeture par
+    //     middle-click est RETIRÉE — plus de close/discard sur le bouton)
+    //   Clic droit → ping-pong MRU (switchToPrevious)
+    //   Molette → rien (réservée — feature future possible)
+    // ================================================================
+    let wasFloating = false; // état urlbar AVANT le blur du mousedown
     btn.addEventListener('mousedown', (e) => {
-      if (e.button === 1) {
+      playClick();
+      if (e.button === 0) {
         e.preventDefault();
         e.stopPropagation();
-        playClick();
-        const tab = gBrowser.selectedTab;
-        // Épinglé/Essential : discard (unload mémoire, onglet conservé)
-        // — même règle que le switcher ctrlTab, API officielle Zen
-        if (tab.pinned || tab.hasAttribute('zen-essential')) {
-          gBrowser.explicitUnloadTabs([tab])
-            // L'onglet passe "pending" → targetTab() l'exclut désormais :
-            // refresh pour que l'icône passe au suivant immédiatement.
-            .then(() => scheduleUpdate())
-            .catch((err) => console.error('[NavBtn] Discard error:', err.message));
-        } else {
-          // FIX blur-target : quand tous les autres onglets sont épinglés/
-          // essentiels (ou exclus du workspace), _findTabToBlurTo retourne
-          // null → l'onglet mourant RESTE sélectionné pendant tout le
-          // teardown → AsyncTabswitcher sur linkedBrowser=null → zombie +
-          // gestion d'onglets morte. Fallback natif Zen (selectEmptyTab),
-          // celui-là même que la pref shouldOpenNewTabIfLastUnpinnedTabIsClosed
-          // désactive (trou natif, reproductible aussi via le X d'onglet).
-          const blurTgt = gBrowser._findTabToBlurTo ? gBrowser._findTabToBlurTo(tab) : null;
-          if (!blurTgt || blurTgt === tab) {
-            try {
-              if (window.gZenWorkspaces && window.gZenWorkspaces.selectEmptyTab) {
-                window.gZenWorkspaces.selectEmptyTab();
-              }
-            } catch (e) {
-              console.warn('[NavBtn] selectEmptyTab fallback failed:', e.message);
-            }
-          }
-          // FIX empty-tab zombie (bug natif Zen) : makeSureEmptyTabIsFirst()
-          // (ZenSpaceManager:1702, appelé par _endRemoveTab:6330 via
-          // updateTabsContainers) re-insère this._emptyTab dans le strip via
-          // insertBefore() même s'il vient d'être détaché par aTab.remove() —
-          // son garde closing/isConnected n'est actif qu'en testingEnabled.
-          // Fermer l'empty tab lui-même → il RESUSCITE en zombie sans browser
-          // (position 0, linkedBrowser=null) → initialBrowser null →
-          // AsyncTabSwitcher throw → gestion d'onglets morte. On détache la
-          // référence avant removeTab pour empêcher la résurrection.
-          if (window.gZenWorkspaces && window.gZenWorkspaces._emptyTab === tab) {
-            window.gZenWorkspaces._emptyTab = null;
-          }
-          gBrowser.removeTab(tab);
-        }
-        return;
+        // Snapshot AVANT la default action du mousedown : le focus quitte
+        // l'urlbar flottante → son blur la ferme → le snapshot est la vérité
+        // du press (sinon le mouseup ne saurait pas fermer ou ouvrir).
+        wasFloating = !!(window.URLBar20 && URLBar20.floatingActive);
       }
+    });
+
+    btn.addEventListener('mouseup', (e) => {
       if (e.button !== 0) return;
+      // Dépression visible : le retract attend 250ms (spec 05/11)
+      if (edgeRetract) setTimeout(edgeRetract, 250);
+      if (wasFloating) {
+        window.URLBar20?.closeFloating?.();
+      } else {
+        window.URLBar20?.openFloating?.();
+      }
+    });
+
+    // Middle-click → ouvrir le ctrlTab custom
+    btn.addEventListener('mousedown', (e) => {
+      if (e.button !== 1) return;
       e.preventDefault();
       e.stopPropagation();
       playClick();
-      switchToPrevious();
+      if (!window.ctrlTab.isOpen) openInstant(window.ctrlTab);
     });
 
     // Sécurité : tuer l'auxclick middle (coller presse-papier, etc.)
@@ -438,13 +424,14 @@
       }
     });
 
-    // Clic droit → switcher ctrlTab (et tuer le contextmenu natif)
+    // Clic droit → ping-pong MRU (et tuer le contextmenu natif)
     btn.addEventListener(
       'contextmenu',
       (e) => {
         e.preventDefault();
         e.stopImmediatePropagation();
-        if (!window.ctrlTab.isOpen) openInstant(window.ctrlTab);
+        playClick();
+        switchToPrevious();
       },
       true,
     );
@@ -1189,6 +1176,7 @@
       wrapEl.classList.add('navbtn-notarget');
       state = 'idle';
     };
+    edgeRetract = retract;
 
     const reveal = () => {
       if (state !== 'idle') return;
